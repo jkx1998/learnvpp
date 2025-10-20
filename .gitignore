@@ -173,3 +173,8 @@ compile_commands.json
 
 # log file archives
 /archives
+
+# myplugin
+/src/plugins/myplugin/
+
+/build-root/dpdk_mlx_default.sh
