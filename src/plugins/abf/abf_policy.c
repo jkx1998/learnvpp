@@ -27,6 +27,7 @@ fib_node_type_t abf_policy_fib_node_type;
 
 /**
  * Pool of ABF objects
+ * 声明了一个名为 abf_policy_pool 的静态指针变量。该指针用于指向一个或多个 abf_policy_t 类型的内存区域。
  */
 static abf_policy_t *abf_policy_pool;
 
@@ -80,6 +81,14 @@ int
 abf_policy_update (u32 policy_id,
 		   u32 acl_index, const fib_route_path_t * rpaths)
 {
+  /*QA: ap 和 abf_policy_pool不都是policy_t的静态指针吗？为甚需要两者相减得到一个新的policy_id?
+   *- `abf_policy_pool` 指向池的起始地址
+    - `ap` 指向池中某个具体元素的地址
+    - 两者相减得到的是该元素在池中的索引位置
+      这类似于数组索引：`&array[i] - array = i`
+   */
+
+
   abf_policy_t *ap;
   u32 api;
 
@@ -89,6 +98,14 @@ abf_policy_update (u32 policy_id,
     {
       /*
        * create a new policy
+       * QA:pool_get的用法？
+       *    - 从 `abf_policy_pool` 池中分配一个新的元素
+            - 将新元素的地址存储在 `ap` 指针中
+            - 如果池中没有空闲元素，会自动扩展池的大小
+
+       * Q:fib_node_init是什么意思？这使ABF策略能够参与到FIB的依赖图系统中？
+
+       * Q:fib_path_list_create函数解读？
        */
       pool_get (abf_policy_pool, ap);
 
@@ -102,6 +119,11 @@ abf_policy_update (u32 policy_id,
       /*
        * become a child of the path list so we get poked when
        * the forwarding changes.
+       * QA:为啥要为添加路径列表字节点？什么是路径列表子节点？
+       * - 当路径列表发生变化时（如路径添加/删除），需要通知所有依赖它的对象
+       * - ABF策略作为路径列表的子节点，当路径列表变化时会收到通知
+       * - `ap->ap_sibling` 存储子节点关系标识，用于后续移除关系
+
        */
       ap->ap_sibling = fib_path_list_child_add (ap->ap_pl,
 						abf_policy_fib_node_type,
@@ -109,11 +131,21 @@ abf_policy_update (u32 policy_id,
 
       /*
        * add this new policy to the DB
+       * QA：实现的原理是，怎么添加到数据库，数据库张什么样子？
+       * - `abf_policy_db` 是一个哈希表，键是policy_id，值是池索引api
+       * - 实现policy_id到池索引的快速查找
+       * - 哈希表结构：`policy_id -> api` 的映射关系
+
        */
       hash_set (abf_policy_db, policy_id, api);
 
       /*
        * take a lock on behalf of the CLI/API creation
+       * QA：为啥要锁定fib节点？
+       * - 防止在配置过程中策略被意外删除
+       * - 每个CLI/API创建都会持有一个锁
+       * - 只有当所有锁都释放时，策略才能被销毁
+
        */
       fib_node_lock (&ap->ap_node);
     }
@@ -123,6 +155,10 @@ abf_policy_update (u32 policy_id,
        * update an existing policy.
        * - add the path to the path-list and swap our ancestry
        * - backwalk to poke all attachments to update
+       * QA：abf_policy_get如何实现？
+       * - 使用 `pool_elt_at_index` 根据索引从池中获取元素
+       * - 这是VPP内存池的标准访问方式
+
        */
       fib_node_index_t old_pl;
 
@@ -136,11 +172,22 @@ abf_policy_update (u32 policy_id,
 
       if (FIB_NODE_INDEX_INVALID != old_pl)
 	{
+    //Q：复制路径列表添加新的路径，为啥是复制路径列表而不是直接添加新的路径列表，这个路径列表张什么样子？
+    //复制后确保不影响其他使用者
+    //- 包含多个转发路径（nexthop、接口、权重等）
+    //- 支持负载均衡和故障切换
+
 	  ap->ap_pl = fib_path_list_copy_and_path_add (old_pl,
 						       (FIB_PATH_LIST_FLAG_SHARED
 							|
 							FIB_PATH_LIST_FLAG_NO_URPF),
 						       rpaths);
+    //QA：移除旧的子节点关系，子节点是什么？为什么要移除？路径列表和子节点关系有什么联系
+    /*
+    - 当ABF策略引用路径列表时，它成为路径列表的"子节点"
+    - 当路径列表变化时，所有子节点都会收到通知
+    - 移除旧的子节点关系是因为路径列表已经改变，需要建立新的依赖关系
+    */
 	  fib_path_list_child_remove (old_pl, ap->ap_sibling);
 	}
       else
@@ -203,6 +250,12 @@ abf_policy_delete (u32 policy_id, const fib_route_path_t * rpaths)
   ap = abf_policy_get (api);
   old_pl = ap->ap_pl;
 
+  /*
+   *Q:为什么要锁定路径列表？fib_path_list_lock (old_pl)
+      - __防止竞态条件__：在修改路径列表期间，防止其他线程同时访问或修改同一个路径列表
+      - __确保数据一致性__：在复制和移除路径的过程中，确保路径列表的状态是一致的
+      - __引用计数管理__：锁定会增加引用计数，防止路径列表在操作过程中被意外释放
+  */
   fib_path_list_lock (old_pl);
   ap->ap_pl = fib_path_list_copy_and_path_remove (
     ap->ap_pl, (FIB_PATH_LIST_FLAG_SHARED | FIB_PATH_LIST_FLAG_NO_URPF),
@@ -216,11 +269,19 @@ abf_policy_delete (u32 policy_id, const fib_route_path_t * rpaths)
       /*
        * no more paths on this policy. It's toast
        * remove the CLI/API's lock
+       * Q：上面代码并没有看出来锁ap_node,但是为什么这里有解锁ap_node的动作？
+            这个锁是在策略创建时设置的，不是在删除函数中设置的
        */
       fib_node_unlock (&ap->ap_node);
     }
   else
     {
+      //Q：我没理解else后的逻辑？
+      /*
+      - 重新建立与新路径列表的子节点依赖关系
+      - 通过回走机制触发FIB系统中所有依赖对象的重新评估
+      - 保持策略的活跃状态
+      */
       ap->ap_sibling =
 	fib_path_list_child_add (ap->ap_pl, abf_policy_fib_node_type, api);
 
