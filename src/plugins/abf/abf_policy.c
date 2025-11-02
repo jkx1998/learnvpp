@@ -67,12 +67,16 @@ u32
 abf_policy_find (u32 policy_id)
 {
   uword *p;
-
+  //从db数据库中获取key的值的指针
   p = hash_get (abf_policy_db, policy_id);
 
   if (NULL != p)
-    return (p[0]);
-
+    return (p[0]);// 如果找到，返回哈希表中存储的值（策略索引）
+    //p[0] 是为了从指针获取实际存储的值，而 p 只是指向那个值的地址。
+    // 三个不同的概念：
+    // 1. p        - 指针变量，存储的是数据的地址
+    // 2. p[0]、*p - 指针指向的数据（实际值）
+    // 3. &p       - 指针变量本身的地址
   return (INDEX_INVALID);
 }
 
@@ -109,10 +113,14 @@ abf_policy_update (u32 policy_id,
        */
       pool_get (abf_policy_pool, ap);
 
+      //将内存地址转换为池中的索引位置
       api = ap - abf_policy_pool;
+      //这是一个 FIB 节点的初始化函数，用于设置新创建的 FIB 节点的初始状态。fib_node_t
       fib_node_init (&ap->ap_node, abf_policy_fib_node_type);
+      //abf_policy_t init 
       ap->ap_acl = acl_index;
       ap->ap_id = policy_id;
+      //用于创建 FIB路径列表，这是 VPP 转发系统的核心组件，用于管理数据包的转发路径。
       ap->ap_pl = fib_path_list_create ((FIB_PATH_LIST_FLAG_SHARED |
 					 FIB_PATH_LIST_FLAG_NO_URPF), rpaths);
 
@@ -123,7 +131,7 @@ abf_policy_update (u32 policy_id,
        * - 当路径列表发生变化时（如路径添加/删除），需要通知所有依赖它的对象
        * - ABF策略作为路径列表的子节点，当路径列表变化时会收到通知
        * - `ap->ap_sibling` 存储子节点关系标识，用于后续移除关系
-
+        这个函数用于向路径列表添加子节点，实现 FIB 系统中的依赖关系管理，并包含一个重要的性能优化机制。
        */
       ap->ap_sibling = fib_path_list_child_add (ap->ap_pl,
 						abf_policy_fib_node_type,

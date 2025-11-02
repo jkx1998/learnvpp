@@ -441,20 +441,38 @@ lookup (void *v, uword key, enum lookup_opcode op,
   return &p->direct;
 }
 
-/* Fetch value of key. */
+/* Fetch value of key.
+- `__clib_export`：表示这个函数是库的导出函数
+- `void *v`：指向哈希表的指针
+- `uword key`：要查找的键值
+- 返回值：指向找到的值的指针，如果没找到返回0
+*/
 __clib_export uword *
 _hash_get (void *v, uword key)
 {
+  //通过 `hash_header` 宏获取哈希表的结构信息
   hash_t *h = hash_header (v);
   hash_pair_t *p;
 
-  /* Don't even search table if its empty. */
+  /* Don't even search table if its empty. 
+  如果哈希表指针为空或者表中没有元素，直接返回0，避免不必要的查找
+  */
   if (!v || h->elts == 0)
     return 0;
 
+  /*- 调用 `lookup` 函数进行实际的查找
+    - `GET`：操作类型，表示获取操作
+    - 后两个参数为0：不需要设置新值，也不需要获取旧值
+  */
   p = lookup (v, key, GET, 0, 0);
+  //如果没找到对应的键值对，返回0
   if (!p)
     return 0;
+  /*
+  `log2_pair_size` 控制键值对的内存布局：
+    - 如果为0：表示键值对结构简单，直接返回键的地址
+    - 否则：返回值的地址（`value[0]`）
+  */
   if (h->log2_pair_size == 0)
     return &p->key;
   else
