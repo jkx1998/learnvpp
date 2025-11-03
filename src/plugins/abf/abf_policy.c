@@ -37,7 +37,7 @@ static abf_policy_t *abf_policy_pool;
  */
 static uword *abf_policy_db;
 
-
+//根据pool和index算出对应元素abf_policy_pool指针地址
 abf_policy_t *
 abf_policy_get (u32 index)
 {
@@ -153,7 +153,7 @@ abf_policy_update (u32 policy_id,
        * - 防止在配置过程中策略被意外删除
        * - 每个CLI/API创建都会持有一个锁
        * - 只有当所有锁都释放时，策略才能被销毁
-
+         函数是一个简单的引用计数递增函数，用于管理 FIB（转发信息库）节点的生命周期。
        */
       fib_node_lock (&ap->ap_node);
     }
