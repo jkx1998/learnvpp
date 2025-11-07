@@ -545,7 +545,9 @@ fib_path_list_alloc (fib_node_index_t *path_list_index)
 {
     fib_path_list_t *path_list;
 
+    //分配一块内存地址给path—list
     pool_get(fib_path_list_pool, path_list);
+    //对刚分配的内存区全部清0
     clib_memset(path_list, 0, sizeof(*path_list));
 
     fib_node_init(&path_list->fpl_node,
@@ -553,8 +555,10 @@ fib_path_list_alloc (fib_node_index_t *path_list_index)
     path_list->fpl_urpf = INDEX_INVALID;
     path_list->fpl_paths = NULL;
 
+    //返回它在 fib_path_list_pool 内存池中的索引
     *path_list_index = fib_path_list_get_index(path_list);
 
+    //调试宏
     FIB_PATH_LIST_DBG(path_list, "alloc");
 
     return (path_list);
@@ -664,7 +668,7 @@ fib_path_list_is_popular (fib_node_index_t path_list_index)
 
     return (path_list->fpl_flags & FIB_PATH_LIST_FLAG_POPULAR);
 }
-
+//如果一个路径列表是 "DROP"（丢弃）类型或 "EXCLUSIVE"（独占）类型，那么它就不能是 "SHARED"（共享）类型。
 static fib_path_list_flags_t
 fib_path_list_flags_fixup (fib_path_list_flags_t flags)
 {
@@ -679,7 +683,7 @@ fib_path_list_flags_fixup (fib_path_list_flags_t flags)
 
     return (flags);
 }
-
+//const 表示这个函数只会读取rpaths数组中的数据，而不会修改它。
 fib_node_index_t
 fib_path_list_create (fib_path_list_flags_t flags,
 		      const fib_route_path_t *rpaths)
@@ -734,6 +738,10 @@ fib_path_list_create (fib_path_list_flags_t flags,
 	    /*
 	     * if there was not a matching path-list, then this
 	     * new one will need inserting into the DB and resolving.
+         * 在解析路径列表的过程中，可能会递归地创建新的对象，
+         * 这些创建操作可能会触发 VPP 的内存池或动态向量进行扩容，导致内存重分配（realloc）。
+         * 这种重分配会移动内存中已有对象的位置，从而使原有的指向这些对象的指针失效。
+         * 该函数通过使用稳定的索引来代替不稳定的指针，完美地规避了这个问题。
 	     */
 	    fib_path_list_db_insert(path_list_index);
 	    path_list = fib_path_list_resolve(path_list);
