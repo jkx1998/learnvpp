@@ -928,9 +928,11 @@ fib_path_list_copy_and_path_add (fib_node_index_t orig_path_list_index,
     /*
      * alloc the new list before we retrieve the old one, lest
      * the alloc result in a realloc
+     * 函数会调用 fib_path_list_alloc 来创建一个新的、空的路径列表，并获取其索引。
      */
     path_list = fib_path_list_alloc(&path_list_index);
 
+    //函数通过 fib_path_list_get 获取原始路径列表的指针，并遍历其中的每一条路径。
     orig_path_list = fib_path_list_get(orig_path_list_index);
 
     FIB_PATH_LIST_DBG(orig_path_list, "copy-add");
@@ -938,15 +940,19 @@ fib_path_list_copy_and_path_add (fib_node_index_t orig_path_list_index,
     flags = fib_path_list_flags_fixup(flags);
     path_list->fpl_flags = flags;
 
+    //vec_validate 是一个确保向量足够长以包含指定索引的宏函数。
+    //它会自动扩展向量（如果需要），使得索引 I 在向量 V 中有效。
     vec_validate(path_list->fpl_paths,
                  (vec_len(orig_path_list->fpl_paths) +
                   vec_len(rpaths) - 1));
     pi = 0;
 
+
     vec_foreach(orig_path_index, orig_path_list->fpl_paths)
     {
         /*
          * copy the original paths over to the new list
+         这里使用 fib_path_copy 创建路径的副本，而不是直接引用，确保新路径列表的独立性。
          */
         path_list->fpl_paths[pi++] = fib_path_copy(*orig_path_index,
                                                    path_list_index);
