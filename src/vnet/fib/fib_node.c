@@ -151,12 +151,17 @@ fib_node_child_remove (fib_node_type_t parent_type,
     fib_node_unlock(parent);
 }
 
+//fib_node_type_t用来区分不同种类的FIB节点
+//为了避免在内存重分配时出现指针失效的问题，节点之间不直接使用C指针引用，
+//而是通过“类型+索引”的方式来唯一标识和安全地检索一个节点
 u32
 fib_node_get_n_children (fib_node_type_t parent_type,
                          fib_node_index_t parent_index)
 {
     fib_node_t *parent;
 
+    //它存储了指向各个节点类型的虚函数表（VFT）的指针
+    //通过 parent_type 作为下标，从数组中选取对应节点类型的虚函数表。
     parent = fn_vfts[parent_type].fnv_get(parent_index);
 
     return (fib_node_list_get_size(parent->fn_children));
