@@ -91,6 +91,7 @@ fib_node_list_head_get (fib_node_list_t fi)
     return (pool_elt_at_index(fib_node_list_head_pool, fi));
 }
 
+//创建新的列表元素。
 static fib_node_list_elt_t *
 fib_node_list_elt_create (fib_node_list_head_t *head,
                           int id,
@@ -99,15 +100,20 @@ fib_node_list_elt_create (fib_node_list_head_t *head,
 {
     fib_node_list_elt_t *elt;
 
+    // 1. 从内存池获取新元素
     pool_get(fib_node_list_elt_pool, elt);
 
+    // 2. 设置元素所属列表
     elt->fnle_list = fib_node_list_head_get_index(head);
+    // 3. 设置元素所有者信息
     elt->fnle_owner.fnp_type  = type;
     elt->fnle_owner.fnp_index = index;
 
+    // 4. 初始化链表指针为无效值
     elt->fnle_next = FIB_NODE_INDEX_INVALID;
     elt->fnle_prev = FIB_NODE_INDEX_INVALID;
 
+    // 5. 返回新创建的元素指针
     return (elt);
 }
 
@@ -126,10 +132,13 @@ fib_node_list_create (void)
 {
     fib_node_list_head_t *head;
 
+    // 1. 从内存池获取列表头
     pool_get(fib_node_list_head_pool, head);
 
+    // 2. 初始化列表头
     fib_node_list_head_init(head);
 
+    // 3. 返回列表头的索引
     return (fib_node_list_head_get_index(head));
 }
 
@@ -161,21 +170,28 @@ fib_node_list_push_front (fib_node_list_t list,
     fib_node_list_elt_t *elt, *next;
     fib_node_list_head_t *head;
 
+    // 1. 获取列表头
     head = fib_node_list_head_get(list);
+    // 2. 创建新元素
     elt = fib_node_list_elt_create(head, owner_id, type, index);
 
-    elt->fnle_prev = FIB_NODE_INDEX_INVALID;
-    elt->fnle_next = head->fnlh_head;
+    // 3. 设置新元素的前后指针
+    elt->fnle_prev = FIB_NODE_INDEX_INVALID;// 前端插入，前驱为无效
+    elt->fnle_next = head->fnlh_head;       // 后继指向原来的头元素
 
+    // 4. 如果列表非空，更新原头元素的前驱指针
     if (FIB_NODE_INDEX_INVALID != head->fnlh_head)
     {
         next = fib_node_list_elt_get(head->fnlh_head);
         next->fnle_prev = fib_node_list_elt_get_index(elt);
     }
+    // 5. 更新列表头指针指向新元素
     head->fnlh_head = fib_node_list_elt_get_index(elt);
 
+    // 6. 增加元素计数
     head->fnlh_n_elts++;
 
+    // 7. 返回新元素的索引
     return (fib_node_list_elt_get_index(elt));
 }
 

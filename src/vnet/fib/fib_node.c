@@ -124,9 +124,11 @@ fib_node_child_add (fib_node_type_t parent_type,
 
     if (FIB_NODE_INDEX_INVALID == parent->fn_children)
     {
+        // 函数用于创建一个新的 FIB list节点列表，并返回其索引。
         parent->fn_children = fib_node_list_create();
     }   
 
+    //这个函数用于在 FIB 节点列表的前端插入一个新元素
     return (fib_node_list_push_front(parent->fn_children,
                                      0, type,
                                      index));
