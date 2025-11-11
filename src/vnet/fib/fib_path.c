@@ -193,6 +193,9 @@ typedef struct fib_path_t_ {
     /**
      * This marks the start of the memory area used to hash
      * the path
+     * - 使用标记来定义哈希计算的范围
+     * - 只对配置信息行哈希，不包括运行时解析状态
+     * - 确保相同配置的路径有相同的哈希值
      */
     STRUCT_MARK(path_hash_start);
 

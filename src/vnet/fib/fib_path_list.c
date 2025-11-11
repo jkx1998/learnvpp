@@ -1324,15 +1324,22 @@ fib_path_list_child_add (fib_node_index_t path_list_index,
          * situation where we are adding and removing entries such that we
          * flip-flop over the threshold, then this non-trivial work is added
          * to each of those routes adds/deletes - not a situation we want.
+         *  一旦设置为流行，不会撤销
+            原因：使用此前缀的表项数量很大，收敛需要大量工作
+            避免在阈值附近频繁添加/删除造成的抖动
          */
+
+        //反向遍历的上下文，遍历原因（接口状态变化，邻接更新，重新评估）
         fib_node_back_walk_ctx_t ctx = {
             .fnbw_reason = FIB_NODE_BW_REASON_FLAG_EVALUATE,
         };
         fib_path_list_t *path_list;
 
         path_list = fib_path_list_get(path_list_index);
+        //执行位或运算
         path_list->fpl_flags |= FIB_PATH_LIST_FLAG_POPULAR;
 
+    //立即遍历所有子节点，通知它们父节点已成为"流行节点
 	fib_walk_sync(FIB_NODE_TYPE_PATH_LIST, path_list_index, &ctx);
     }
 
