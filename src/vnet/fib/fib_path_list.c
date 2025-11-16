@@ -372,6 +372,7 @@ fib_path_list_mk_lb (fib_path_list_t *path_list,
 
     /*
      * We gather the DPOs from resolved paths.
+     * 负责从已解析的路径中收集 DPO (Data-Path Object) 来构建负载均衡对象。
      */
     vec_foreach (path_index, path_list->fpl_paths)
     {
@@ -1230,8 +1231,10 @@ fib_path_list_contribute_forwarding (fib_node_index_t path_list_index,
 {
     fib_path_list_t *path_list;
 
+    //通过索引从内存池中获取路径列表结构体指针。
     path_list = fib_path_list_get(path_list_index);
 
+    //构建负载均衡
     fib_path_list_mk_lb(path_list, fct, dpo, flags);
 
     ASSERT(DPO_LOAD_BALANCE == dpo->dpoi_type);
@@ -1239,6 +1242,7 @@ fib_path_list_contribute_forwarding (fib_node_index_t path_list_index,
     /*
      * If there's only one bucket in the load-balance then we can
      * squash it out.
+     * 负载均衡优化
      */
     if ((1 == load_balance_n_buckets(dpo->dpoi_index)) &&
         (FIB_PATH_LIST_FWD_FLAG_COLLAPSE & flags))
