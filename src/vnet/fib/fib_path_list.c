@@ -389,6 +389,8 @@ fib_path_list_mk_lb (fib_path_list_t *path_list,
     /*
      * Path-list load-balances, which if used, would be shared and hence
      * never need a load-balance map.
+     * 将创建的负载均衡对象设置到 DPO 中
+     * 更新负载均衡对象的多路径信息，同时保证数据包转发的一致性
      */
     dpo_set(dpo,
             DPO_LOAD_BALANCE,
